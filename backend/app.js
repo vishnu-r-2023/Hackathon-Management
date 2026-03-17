@@ -2,6 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const helmet = require("helmet");
+const path = require("path");
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -14,6 +17,7 @@ const evaluationRoutes = require("./routes/evaluationRoutes");
 const resultRoutes = require("./routes/resultRoutes");
 
 const app = express();
+const swaggerDocument = YAML.load(path.join(__dirname, "swagger.yaml"));
 
 app.use(helmet());
 app.use(cors());
@@ -23,6 +27,8 @@ app.use(morgan("dev"));
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
+
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);

@@ -1,0 +1,477 @@
+openapi: 3.0.3
+info:
+  title: Hackathon Management API
+  version: 1.0.0
+  description: API documentation for authentication, hackathons, teams, submissions, evaluations, results, and users.
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Hackathons
+  - name: Teams
+  - name: Submissions
+  - name: Evaluations
+  - name: Results
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+    AuthRequestRegister:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [admin, participant, judge]
+          default: participant
+        bootstrapSecret:
+          type: string
+          description: Required only when registering admin or judge.
+    AuthRequestLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    HackathonCreate:
+      type: object
+      required: [title, startDate, endDate]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+    HackathonUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+    TeamCreate:
+      type: object
+      required: [name, hackathonId]
+      properties:
+        name:
+          type: string
+        hackathonId:
+          type: string
+    SubmissionCreate:
+      type: object
+      required: [teamId, projectTitle]
+      properties:
+        teamId:
+          type: string
+        hackathonId:
+          type: string
+        projectTitle:
+          type: string
+        description:
+          type: string
+        githubLink:
+          type: string
+          format: uri
+        demoLink:
+          type: string
+          format: uri
+    AssignJudge:
+      type: object
+      required: [judgeId]
+      properties:
+        judgeId:
+          type: string
+    EvaluationCreate:
+      type: object
+      required: [submissionId, score]
+      properties:
+        submissionId:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        feedback:
+          type: string
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: API is healthy
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequestRegister"
+      responses:
+        "201":
+          description: User created
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden role registration
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequestLogin"
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Invalid credentials
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [admin, participant, judge]
+      responses:
+        "200":
+          description: Users list
+  /api/users/{id}:
+    delete:
+      tags: [Users]
+      summary: Delete user (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deleted
+  /api/hackathons:
+    get:
+      tags: [Hackathons]
+      summary: List hackathons
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [upcoming, ongoing, completed]
+      responses:
+        "200":
+          description: Hackathons list
+    post:
+      tags: [Hackathons]
+      summary: Create hackathon (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HackathonCreate"
+      responses:
+        "201":
+          description: Hackathon created
+  /api/hackathons/{id}:
+    get:
+      tags: [Hackathons]
+      summary: Get hackathon by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Hackathon found
+    put:
+      tags: [Hackathons]
+      summary: Update hackathon (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HackathonUpdate"
+      responses:
+        "200":
+          description: Hackathon updated
+    delete:
+      tags: [Hackathons]
+      summary: Delete hackathon (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Hackathon deleted
+  /api/hackathons/{hackathonId}/analytics:
+    get:
+      tags: [Hackathons]
+      summary: Get hackathon analytics (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: hackathonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Hackathon analytics
+  /api/teams:
+    post:
+      tags: [Teams]
+      summary: Create team (participant only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamCreate"
+      responses:
+        "201":
+          description: Team created
+  /api/teams/join/{teamId}:
+    post:
+      tags: [Teams]
+      summary: Join team (participant only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: teamId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Team joined
+  /api/teams/{hackathonId}:
+    get:
+      tags: [Teams]
+      summary: Get teams by hackathon (authenticated)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: hackathonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Teams list
+  /api/submissions:
+    post:
+      tags: [Submissions]
+      summary: Create submission (participant only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionCreate"
+      responses:
+        "201":
+          description: Submission created
+    get:
+      tags: [Submissions]
+      summary: List submissions (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: hackathonId
+          schema:
+            type: string
+        - in: query
+          name: teamId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Submission list
+  /api/submissions/assigned:
+    get:
+      tags: [Submissions]
+      summary: Get assigned submissions (judge only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Assigned submissions
+  /api/submissions/{submissionId}/assign-judge:
+    post:
+      tags: [Submissions]
+      summary: Assign judge to submission (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: submissionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignJudge"
+      responses:
+        "200":
+          description: Judge assigned
+  /api/evaluations:
+    post:
+      tags: [Evaluations]
+      summary: Submit evaluation (judge only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationCreate"
+      responses:
+        "201":
+          description: Evaluation submitted
+  /api/evaluations/{submissionId}:
+    get:
+      tags: [Evaluations]
+      summary: Get evaluations by submission (authenticated)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: submissionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Evaluations list
+  /api/results/publish/{hackathonId}:
+    post:
+      tags: [Results]
+      summary: Publish results (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: hackathonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Results published
+  /api/results/{hackathonId}:
+    get:
+      tags: [Results]
+      summary: Get results by hackathon
+      parameters:
+        - in: path
+          name: hackathonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Results list
