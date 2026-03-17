@@ -28,9 +28,13 @@ const register = asyncHandler(async (req, res) => {
 
   const user = await User.create({ name, email, password, role });
   const token = signToken(user);
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
 
   res.status(201).json({
-    token,
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
   });
 });
@@ -45,9 +49,12 @@ const login = asyncHandler(async (req, res) => {
   if (!ok) throw new AppError("Invalid credentials", 401);
 
   const token = signToken(user);
-
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
   res.json({
-    token,
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
   });
 });
