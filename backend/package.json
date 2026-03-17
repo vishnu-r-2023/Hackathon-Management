@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "user-friendly platform",
   "license": "ISC",
-  "author": "",
+  "author": "vishnu",
   "type": "commonjs",
   "main": "index.js",
   "scripts": {

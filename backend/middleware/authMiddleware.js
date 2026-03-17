@@ -1,14 +1,40 @@
 const jwt = require("jsonwebtoken");
 const AppError = require("../utils/AppError");
 
+function getTokenFromAuthorizationHeader(req) {
+  const header = req.get("authorization") || req.get("Authorization");
+  if (!header) return null;
+  if (!header.startsWith("Bearer ")) return null;
+  return header.slice(7).trim() || null;
+}
+
+function getTokenFromCookieHeader(req) {
+  const cookieHeader = req.headers?.cookie;
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(";").map((c) => c.trim());
+  const tokenCookie = cookies.find((c) => c.startsWith("token="));
+  if (!tokenCookie) return null;
+
+  const raw = tokenCookie.slice("token=".length);
+  if (!raw) return null;
+
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function authMiddleware(req, res, next) {
-  const authHeader =req.cookies.token;
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : null;
+  let token = getTokenFromAuthorizationHeader(req) || getTokenFromCookieHeader(req);
+
+  if (token?.startsWith("Bearer ")) {
+    token = token.slice(7).trim();
+  }
 
   if (!token) {
-    return next(new AppError("Missing Authorization Bearer token", 401));
+    return next(new AppError("Missing authentication token", 401));
   }
 
   const secret = process.env.JWT_SECRET;

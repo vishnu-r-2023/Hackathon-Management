@@ -9,6 +9,7 @@ const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   const role = req.body.role || "participant";
   const bootstrapSecret = req.body.bootstrapSecret;
+  const normalizedEmail = String(email).trim().toLowerCase();
 
   if (!ROLES.includes(role)) {
     throw new AppError("Invalid role", 400);
@@ -21,12 +22,12 @@ const register = asyncHandler(async (req, res) => {
     }
   }
 
-  const existing = await User.findOne({ email }).lean();
+  const existing = await User.findOne({ email: normalizedEmail }).lean();
   if (existing) {
     throw new AppError("Email already registered", 409);
   }
 
-  const user = await User.create({ name, email, password, role });
+  const user = await User.create({ name, email: normalizedEmail, password, role });
   const token = signToken(user);
   res.cookie("token", token, {
     httpOnly: true,
@@ -36,13 +37,15 @@ const register = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    token,
   });
 });
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = String(email).trim().toLowerCase();
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ email: normalizedEmail }).select("+password");
   if (!user) throw new AppError("Invalid credentials", 401);
 
   const ok = await user.comparePassword(password);
@@ -56,6 +59,7 @@ const login = asyncHandler(async (req, res) => {
   });
   res.json({
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    token,
   });
 });
 
