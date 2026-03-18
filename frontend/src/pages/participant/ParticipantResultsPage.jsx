@@ -15,7 +15,9 @@ export default function ParticipantResultsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
 
-  const hackathonsQuery = useAsyncData(() => hackathonsApi.list({ limit: 100 }), []);
+  const hackathonsQuery = useAsyncData(() => hackathonsApi.list({ limit: 100 }), [], {
+    refreshInterval: 5000,
+  });
   const hackathons = hackathonsQuery.data?.hackathons || [];
   const selectedHackathonId = searchParams.get("hackathon") || "";
 
@@ -36,12 +38,19 @@ export default function ParticipantResultsPage() {
   const resultsQuery = useAsyncData(
     () => resultsApi.get(selectedHackathonId),
     [selectedHackathonId],
-    { enabled: Boolean(selectedHackathonId && selectedHackathon?.resultsPublished) }
+    {
+      enabled: Boolean(selectedHackathonId && selectedHackathon?.resultsPublished),
+      refreshInterval: 5000,
+    }
   );
 
   const leaderboard = resultsQuery.data?.leaderboard || [];
   const paged = leaderboard.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const podium = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedHackathonId]);
 
   if (hackathonsQuery.loading) {
     return <Card className="p-10">Loading results workspace...</Card>;
@@ -98,7 +107,7 @@ export default function ParticipantResultsPage() {
 
       {!selectedHackathon?.resultsPublished ? (
         <EmptyState
-          description="Results have not been published for this hackathon yet."
+          description="Results have not been published for this hackathon yet. This page refreshes automatically when the leaderboard goes live."
           icon="timer"
           title="Leaderboard pending"
         />

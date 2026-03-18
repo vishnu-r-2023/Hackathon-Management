@@ -30,7 +30,7 @@ export default function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none",
         VARIANTS[variant],
         SIZES[size],
         className

@@ -38,7 +38,7 @@ const CORE_FUNCTIONALITIES = [
 const BENEFITS = [
   {
     title: "Less operational overhead",
-    description: "The homepage now behaves like a product overview instead of a separate themed shell.",
+    description: "Keep schedules, teams, judging, and results organized in one place.",
     icon: "speed",
   },
   {
@@ -48,7 +48,7 @@ const BENEFITS = [
   },
   {
     title: "Cleaner day-to-day usage",
-    description: "The theme toggle now changes the full page backdrop instead of leaving a dark rounded layer.",
+    description: "Move through the workspace comfortably in either light or dark mode.",
     icon: "clean_hands",
   },
 ];
@@ -255,8 +255,8 @@ export default function HomePage() {
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-ink-600 dark:text-slate-300">
-                The rounded dark layer is gone. The whole page now owns the background, and
-                it switches cleanly between light and dark with the existing theme toggle.
+                Plan events, coordinate teams, review submissions, and publish outcomes
+                from one focused workspace.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -313,7 +313,7 @@ export default function HomePage() {
 
                     <p className="mt-4 text-sm leading-7 text-ink-600 dark:text-slate-200">
                       {focusHackathon?.description ||
-                        "This panel keeps the first fold useful by surfacing the most relevant public event instead of decorative filler."}
+                        "Highlight upcoming timelines, participation, and results from a single live event snapshot."}
                     </p>
 
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -384,8 +384,8 @@ export default function HomePage() {
                 Core Functionalities
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-ink-600 dark:text-slate-400">
-                The dashboard feel now comes from the page itself, while each section stays
-                tied to the existing React app and live data.
+                Every role works from the same live event data, so planning, submissions,
+                and judging stay aligned.
               </p>
             </div>
 
@@ -413,7 +413,8 @@ export default function HomePage() {
                   Active Hackathons
                 </h2>
                 <p className="mt-2 text-ink-600 dark:text-slate-400">
-                  Live events with the same card language in both themes.
+                  Browse live and upcoming events, then jump into the workspace that
+                  matches your role.
                 </p>
               </div>
             </div>
@@ -461,7 +462,7 @@ export default function HomePage() {
                   No hackathons live yet
                 </h3>
                 <p className="mx-auto mt-3 max-w-xl text-sm text-ink-600 dark:text-slate-400">
-                  Create one from the admin console and it will appear here automatically.
+                  New events will appear here as soon as they open for participants.
                 </p>
               </Surface>
             )}

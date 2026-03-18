@@ -89,9 +89,6 @@ export default function RegisterPage() {
               Sign in
             </Link>
           </p>
-          <p className="text-xs uppercase tracking-[0.25em] text-ink-400">
-            Role-based access with protected dashboards
-          </p>
         </div>
       }
     >
@@ -177,7 +174,7 @@ export default function RegisterPage() {
         {form.role !== "participant" ? (
           <div className="md:col-span-2">
             <TextField
-              hint="Required by the backend for admin and judge onboarding."
+              hint="Needed to create admin and judge accounts."
               icon="key"
               label="Bootstrap secret"
               onChange={(event) => updateField("bootstrapSecret", event.target.value)}

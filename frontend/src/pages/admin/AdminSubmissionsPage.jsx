@@ -6,11 +6,16 @@ import EmptyState from "../../components/ui/EmptyState.jsx";
 import Pagination from "../../components/ui/Pagination.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
+import { useSubmissionEvaluations } from "../../hooks/useSubmissionEvaluations.js";
 import { hackathonsApi } from "../../services/api/hackathons.js";
 import { resultsApi } from "../../services/api/results.js";
 import { submissionsApi } from "../../services/api/submissions.js";
 import { usersApi } from "../../services/api/users.js";
 import { formatDateTime, formatNumber } from "../../utils/format.js";
+import {
+  getHackathonPublishState,
+  getSubmissionHackathonId,
+} from "../../utils/publishState.js";
 
 const PAGE_SIZE = 8;
 
@@ -23,7 +28,7 @@ export default function AdminSubmissionsPage() {
   const [busyId, setBusyId] = useState("");
   const [publishHackathonId, setPublishHackathonId] = useState("");
 
-  const { data, error, loading, refetch } = useAsyncData(async () => {
+  const { data, error, loading, refetch, setData } = useAsyncData(async () => {
     const [submissions, judges, hackathons] = await Promise.all([
       submissionsApi.list({ limit: 100 }),
       usersApi.list({ limit: 100, role: "judge" }),
@@ -40,6 +45,28 @@ export default function AdminSubmissionsPage() {
   const submissions = data?.submissions || [];
   const judges = data?.judges || [];
   const hackathons = data?.hackathons || [];
+  const publishTarget = hackathons.find((hackathon) => hackathon._id === publishHackathonId);
+  const publishSubmissionIds = useMemo(
+    () =>
+      submissions
+        .filter((submission) => getSubmissionHackathonId(submission) === publishHackathonId)
+        .map((submission) => submission._id)
+        .filter(Boolean),
+    [publishHackathonId, submissions]
+  );
+  const publishEvaluationsQuery = useSubmissionEvaluations(publishSubmissionIds, {
+    refreshInterval: publishHackathonId ? 12000 : 0,
+  });
+  const publishEvaluationMap = publishEvaluationsQuery.data || {};
+  const publishState = useMemo(
+    () =>
+      getHackathonPublishState(
+        publishTarget,
+        submissions,
+        publishEvaluationMap
+      ),
+    [publishEvaluationMap, publishTarget, submissions]
+  );
 
   const filtered = useMemo(() => {
     return submissions.filter((submission) => {
@@ -72,6 +99,7 @@ export default function AdminSubmissionsPage() {
         description: "The submission is now in a judge review lane.",
         type: "success",
       });
+      publishEvaluationsQuery.refetch();
       refetch();
     } catch (nextError) {
       toast.toast({
@@ -87,13 +115,20 @@ export default function AdminSubmissionsPage() {
   async function handlePublishResults() {
     if (!publishHackathonId) return;
     setBusyId(publishHackathonId);
-    const target = hackathons.find((hackathon) => hackathon._id === publishHackathonId);
 
     try {
       await resultsApi.publish(publishHackathonId);
+      setData((current) => ({
+        ...(current || {}),
+        hackathons: (current?.hackathons || []).map((hackathon) =>
+          hackathon._id === publishHackathonId
+            ? { ...hackathon, resultsPublished: true, status: "completed" }
+            : hackathon
+        ),
+      }));
       toast.toast({
         title: "Results published",
-        description: `${target?.title || "Hackathon"} leaderboard is now public.`,
+        description: `${publishTarget?.title || "Hackathon"} leaderboard is now public.`,
         type: "success",
       });
       refetch();
@@ -121,6 +156,23 @@ export default function AdminSubmissionsPage() {
       />
     );
   }
+
+  const publishChecking =
+    publishEvaluationsQuery.loading &&
+    publishSubmissionIds.length > 0 &&
+    !Object.keys(publishEvaluationMap).length;
+  const publishDisabled =
+    !publishHackathonId ||
+    publishChecking ||
+    Boolean(publishEvaluationsQuery.error) ||
+    !publishState.canPublish;
+  const publishSummary = !publishHackathonId
+    ? "Select a hackathon to inspect publish readiness."
+    : publishEvaluationsQuery.error
+      ? publishEvaluationsQuery.error.message
+      : publishChecking
+        ? "Checking score completion across assigned reviews."
+        : publishState.reason;
 
   return (
     <div className="space-y-6">
@@ -162,11 +214,37 @@ export default function AdminSubmissionsPage() {
                 Results publishing
               </p>
               <p className="mt-2 text-sm text-ink-600 dark:text-ink-300">
-                Publish completed hackathons directly from the admin workspace.
+                Publish only after the evaluation set is complete for the selected hackathon.
               </p>
             </div>
+          </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/60 p-4 dark:bg-white/[0.06]">
+              <p className="text-sm text-ink-500 dark:text-ink-300">Submissions</p>
+              <p className="mt-2 font-display text-2xl font-semibold text-ink-900 dark:text-white">
+                {publishHackathonId ? formatNumber(publishState.submissionCount) : "--"}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/60 p-4 dark:bg-white/[0.06]">
+              <p className="text-sm text-ink-500 dark:text-ink-300">Scores in</p>
+              <p className="mt-2 font-display text-2xl font-semibold text-ink-900 dark:text-white">
+                {publishHackathonId ? formatNumber(publishState.completedEvaluations) : "--"}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/60 p-4 dark:bg-white/[0.06]">
+              <p className="text-sm text-ink-500 dark:text-ink-300">Scores pending</p>
+              <p className="mt-2 font-display text-2xl font-semibold text-ink-900 dark:text-white">
+                {publishHackathonId ? formatNumber(publishState.pendingEvaluations) : "--"}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm leading-7 text-ink-500 dark:text-ink-300">
+            {publishSummary}
+          </p>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <select
                 className="field-base min-w-[260px]"
                 onChange={(event) => setPublishHackathonId(event.target.value)}
@@ -180,13 +258,14 @@ export default function AdminSubmissionsPage() {
                 ))}
               </select>
               <Button
-                disabled={!publishHackathonId}
+                className="min-w-[12rem]"
+                disabled={publishDisabled}
                 loading={busyId === publishHackathonId}
                 onClick={handlePublishResults}
+                variant={!publishDisabled && !publishTarget?.resultsPublished ? "primary" : "secondary"}
               >
-                Publish results
+                {publishChecking ? "Checking scores..." : "Publish results"}
               </Button>
-            </div>
           </div>
         </Card>
       </div>

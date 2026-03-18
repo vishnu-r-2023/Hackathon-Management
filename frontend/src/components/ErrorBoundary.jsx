@@ -26,11 +26,11 @@ export default class ErrorBoundary extends Component {
             <span className="material-symbols-outlined text-3xl">error</span>
           </div>
           <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-white">
-            Something broke in the dashboard shell
+            Something went wrong
           </h1>
           <p className="mt-3 text-sm text-ink-600 dark:text-ink-300">
-            Refresh the page to recover. If the problem keeps happening, check the
-            browser console for the captured error.
+            Refresh the page to try again. If the problem keeps happening, share the
+            error below with your team.
           </p>
           {this.state.error?.message ? (
             <p className="mt-4 rounded-2xl bg-black/10 px-4 py-3 text-left text-xs text-ink-700 dark:bg-white/5 dark:text-ink-200">

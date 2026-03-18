@@ -11,7 +11,8 @@ import { computeHackathonStatus, formatNumber, formatRange } from "../../utils/f
 export default function ParticipantOverviewPage() {
   const { data, error, loading } = useAsyncData(
     () => hackathonsApi.list({ limit: 100 }),
-    []
+    [],
+    { refreshInterval: 10000 }
   );
 
   if (loading) {

@@ -43,7 +43,9 @@ export default function ParticipantSubmissionsPage() {
   });
   const [knownSubmission, setKnownSubmission] = useState(null);
 
-  const hackathonsQuery = useAsyncData(() => hackathonsApi.list({ limit: 100 }), []);
+  const hackathonsQuery = useAsyncData(() => hackathonsApi.list({ limit: 100 }), [], {
+    refreshInterval: 5000,
+  });
   const hackathons = hackathonsQuery.data?.hackathons || [];
   const selectedHackathonId = searchParams.get("hackathon") || "";
 
@@ -74,15 +76,16 @@ export default function ParticipantSubmissionsPage() {
     [selectedHackathonId],
     {
       enabled: Boolean(selectedHackathonId && selectedHackathon?.resultsPublished),
+      refreshInterval: 5000,
     }
   );
 
   const resultEntry = useMemo(() => {
-    if (!currentTeam) return null;
+    if (!currentTeam || !selectedHackathon?.resultsPublished) return null;
     return (resultsQuery.data?.leaderboard || []).find(
       (entry) => entry.teamId === getEntityId(currentTeam)
     );
-  }, [currentTeam, resultsQuery.data?.leaderboard]);
+  }, [currentTeam, resultsQuery.data?.leaderboard, selectedHackathon?.resultsPublished]);
 
   useEffect(() => {
     if (!currentTeam) {
@@ -299,7 +302,15 @@ export default function ParticipantSubmissionsPage() {
                   <p className="mt-3 text-sm text-emerald-100/80">
                     Current leaderboard score: {Math.round(resultEntry.avgScore)}
                   </p>
-                ) : null}
+                ) : selectedHackathon?.resultsPublished ? (
+                  <p className="mt-3 text-sm text-emerald-100/80">
+                    Results are live. Scores will appear here once your entry is included in the published set.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm text-emerald-100/80">
+                    Scores refresh here automatically after results are published.
+                  </p>
+                )}
                 <div className="mt-4">
                   <Link className="text-sm font-medium text-white" to={`/app/participant/results?hackathon=${selectedHackathonId}`}>
                     Open results workspace
@@ -319,9 +330,9 @@ export default function ParticipantSubmissionsPage() {
 
             {knownSubmission ? (
               <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/70 p-5 text-sm leading-7 text-ink-600 dark:bg-white/[0.06] dark:text-ink-300">
-                This browser already has a submission record for your team. If the
-                backend returned a prior submission before this browser knew about it,
-                that record is cached locally to preserve status tracking.
+                Your team already has a submission on file for this hackathon. You can
+                review the recorded project title here and return to results when judging
+                is published.
               </div>
             ) : (
               <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>

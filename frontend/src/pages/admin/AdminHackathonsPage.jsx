@@ -9,12 +9,18 @@ import Modal from "../../components/ui/Modal.jsx";
 import Pagination from "../../components/ui/Pagination.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
+import { useSubmissionEvaluations } from "../../hooks/useSubmissionEvaluations.js";
 import { hackathonsApi } from "../../services/api/hackathons.js";
 import { resultsApi } from "../../services/api/results.js";
+import { submissionsApi } from "../../services/api/submissions.js";
 import { usersApi } from "../../services/api/users.js";
 import { cn } from "../../utils/cn.js";
 import { getEntityId } from "../../utils/data.js";
 import { STATUS_STYLES } from "../../utils/constants.js";
+import {
+  getHackathonPublishState,
+  getSubmissionHackathonId,
+} from "../../utils/publishState.js";
 import {
   computeHackathonStatus,
   formatDate,
@@ -57,14 +63,16 @@ export default function AdminHackathonsPage() {
   const toast = useToast();
   const { data, error, loading, refetch, setData } = useAsyncData(
     async () => {
-      const [hackathonsResponse, judgesResponse] = await Promise.all([
+      const [hackathonsResponse, judgesResponse, submissionsResponse] = await Promise.all([
         hackathonsApi.list({ limit: 100 }),
         usersApi.list({ limit: 100, role: "judge" }),
+        submissionsApi.list({ limit: 100 }),
       ]);
 
       return {
         hackathons: hackathonsResponse.hackathons || [],
         judges: judgesResponse.users || [],
+        submissions: submissionsResponse.submissions || [],
       };
     },
     []
@@ -83,6 +91,7 @@ export default function AdminHackathonsPage() {
 
   const hackathons = data?.hackathons || [];
   const judges = data?.judges || [];
+  const submissions = data?.submissions || [];
   const judgesById = useMemo(
     () => new Map(judges.map((judge) => [getEntityId(judge), judge])),
     [judges]
@@ -106,6 +115,34 @@ export default function AdminHackathonsPage() {
   }, [hackathons, judgesById, search, statusFilter]);
 
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleHackathonIds = useMemo(
+    () => new Set(paged.map((hackathon) => hackathon._id)),
+    [paged]
+  );
+  const visibleSubmissionIds = useMemo(
+    () =>
+      submissions
+        .filter((submission) =>
+          visibleHackathonIds.has(getSubmissionHackathonId(submission))
+        )
+        .map((submission) => submission._id)
+        .filter(Boolean),
+    [submissions, visibleHackathonIds]
+  );
+  const visibleEvaluationsQuery = useSubmissionEvaluations(visibleSubmissionIds, {
+    refreshInterval: visibleSubmissionIds.length ? 12000 : 0,
+  });
+  const visibleEvaluationMap = visibleEvaluationsQuery.data || {};
+  const publishStatesByHackathonId = useMemo(
+    () =>
+      new Map(
+        paged.map((hackathon) => [
+          hackathon._id,
+          getHackathonPublishState(hackathon, submissions, visibleEvaluationMap),
+        ])
+      ),
+    [paged, submissions, visibleEvaluationMap]
+  );
 
   function openCreateModal() {
     setEditingHackathon(null);
@@ -204,10 +241,12 @@ export default function AdminHackathonsPage() {
             ...(current || {}),
             hackathons: nextHackathons,
             judges: current?.judges || judges,
+            submissions: current?.submissions || submissions,
           };
         });
       }
 
+      visibleEvaluationsQuery.refetch();
       setModalOpen(false);
     } catch (nextError) {
       setFormError(nextError.message);
@@ -244,6 +283,14 @@ export default function AdminHackathonsPage() {
     setBusyHackathonId(hackathon._id);
     try {
       await resultsApi.publish(hackathon._id);
+      setData((current) => ({
+        ...(current || {}),
+        hackathons: (current?.hackathons || []).map((item) =>
+          item._id === hackathon._id
+            ? { ...item, resultsPublished: true, status: "completed" }
+            : item
+        ),
+      }));
       toast.toast({
         title: "Results published",
         description: `${hackathon.title} leaderboard is now public.`,
@@ -277,6 +324,15 @@ export default function AdminHackathonsPage() {
 
   return (
     <div className="space-y-6">
+      {visibleEvaluationsQuery.error ? (
+        <Card className="p-4">
+          <p className="text-sm font-medium text-rose-600 dark:text-rose-200">
+            Could not verify judge completion for the visible hackathons. Publish
+            actions stay locked until evaluation status loads again.
+          </p>
+        </Card>
+      ) : null}
+
       <Card className="p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -326,6 +382,22 @@ export default function AdminHackathonsPage() {
               const assignedJudges = (hackathon.judgeIds || [])
                 .map((judge) => judge?.name || judgesById.get(getEntityId(judge))?.name)
                 .filter(Boolean);
+              const publishState =
+                publishStatesByHackathonId.get(hackathon._id) ||
+                getHackathonPublishState(hackathon, submissions, {});
+              const publishChecking =
+                visibleEvaluationsQuery.loading &&
+                publishState.submissionCount > 0 &&
+                !Object.keys(visibleEvaluationMap).length;
+              const publishDisabled =
+                publishChecking ||
+                Boolean(visibleEvaluationsQuery.error) ||
+                !publishState.canPublish;
+              const publishSummary = visibleEvaluationsQuery.error
+                ? "Publish readiness is temporarily unavailable."
+                : publishChecking
+                  ? "Checking score completion across assigned reviews."
+                  : publishState.reason;
 
               return (
                 <Card className="p-6" key={hackathon._id}>
@@ -399,6 +471,61 @@ export default function AdminHackathonsPage() {
                     )}
                   </div>
 
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/70 p-4 dark:bg-white/[0.06]">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.24em] text-ink-500 dark:text-ink-400">
+                        Publish readiness
+                      </p>
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]",
+                          hackathon.resultsPublished
+                            ? "border-brand-400/20 bg-brand-500/[0.12] text-brand-300"
+                            : publishDisabled
+                              ? "border-amber-400/20 bg-amber-500/[0.12] text-amber-300"
+                              : "border-emerald-400/20 bg-emerald-500/[0.12] text-emerald-300"
+                        )}
+                      >
+                        {hackathon.resultsPublished
+                          ? "Published"
+                          : publishDisabled
+                            ? "Locked"
+                            : "Ready"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-[1.25rem] border border-white/10 bg-black/[0.03] p-3 dark:bg-black/20">
+                        <p className="text-xs uppercase tracking-[0.22em] text-ink-500 dark:text-ink-400">
+                          Submissions
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-ink-900 dark:text-white">
+                          {formatNumber(publishState.submissionCount)}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.25rem] border border-white/10 bg-black/[0.03] p-3 dark:bg-black/20">
+                        <p className="text-xs uppercase tracking-[0.22em] text-ink-500 dark:text-ink-400">
+                          Scores in
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-ink-900 dark:text-white">
+                          {formatNumber(publishState.completedEvaluations)}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.25rem] border border-white/10 bg-black/[0.03] p-3 dark:bg-black/20">
+                        <p className="text-xs uppercase tracking-[0.22em] text-ink-500 dark:text-ink-400">
+                          Pending
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-ink-900 dark:text-white">
+                          {formatNumber(publishState.pendingEvaluations)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="mt-4 text-sm leading-7 text-ink-500 dark:text-ink-300">
+                      {publishSummary}
+                    </p>
+                  </div>
+
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Button
                       icon="edit"
@@ -415,12 +542,17 @@ export default function AdminHackathonsPage() {
                       Delete
                     </Button>
                     <Button
-                      disabled={status !== "completed" || hackathon.resultsPublished}
+                      className="min-w-[12rem]"
+                      disabled={publishDisabled}
                       loading={busyHackathonId === hackathon._id}
                       onClick={() => handlePublish(hackathon)}
-                      variant="secondary"
+                      variant={!publishDisabled && !hackathon.resultsPublished ? "primary" : "secondary"}
                     >
-                      {hackathon.resultsPublished ? "Published" : "Publish results"}
+                      {hackathon.resultsPublished
+                        ? "Published"
+                        : publishChecking
+                          ? "Checking scores..."
+                          : "Publish results"}
                     </Button>
                   </div>
                 </Card>

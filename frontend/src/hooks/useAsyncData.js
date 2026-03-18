@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export function useAsyncData(fetcher, dependencies = [], options = {}) {
-  const { enabled = true, initialData = null } = options;
+  const { enabled = true, initialData = null, refreshInterval = 0 } = options;
 
   const [data, setData] = useState(initialData);
   const [loading, setLoading] = useState(enabled);
@@ -40,6 +40,20 @@ export function useAsyncData(fetcher, dependencies = [], options = {}) {
       controller.abort();
     };
   }, [enabled, reloadKey, ...dependencies]);
+
+  useEffect(() => {
+    if (!enabled || !refreshInterval) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setReloadKey((value) => value + 1);
+    }, refreshInterval);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [enabled, refreshInterval, ...dependencies]);
 
   return {
     data,

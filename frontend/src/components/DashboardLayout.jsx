@@ -3,26 +3,48 @@ import { useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/auth/AuthContext.jsx";
-import { DASHBOARD_NAVIGATION, ROLE_DESCRIPTIONS, ROLE_LABELS } from "../utils/constants.js";
+import {
+  DASHBOARD_HOME,
+  DASHBOARD_NAVIGATION,
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+} from "../utils/constants.js";
 import { cn } from "../utils/cn.js";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 
-function SidebarLink({ item, onClick }) {
+function isNavigationItemActive(pathname, itemTo, homePath) {
+  if (itemTo === homePath) {
+    return pathname === itemTo;
+  }
+
+  return pathname === itemTo || pathname.startsWith(`${itemTo}/`);
+}
+
+function SidebarLink({ active, exact, item, onClick }) {
   return (
     <NavLink
-      className={({ isActive }) =>
+      className={() =>
         cn(
-          "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-ink-600 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-white",
-          isActive
-            ? "bg-brand-500 text-white shadow-[0_16px_40px_rgba(24,149,255,0.24)] hover:bg-brand-500 hover:text-white dark:text-white"
-            : ""
+          "group relative flex items-center gap-3 overflow-hidden rounded-[1.5rem] border px-4 py-3.5 text-sm font-medium transition-all duration-200",
+          active
+            ? "border-brand-400/20 bg-[linear-gradient(135deg,rgba(24,149,255,0.96),rgba(10,118,219,0.94))] text-white shadow-[0_20px_42px_rgba(24,149,255,0.28)]"
+            : "border-transparent text-ink-600 hover:border-black/5 hover:bg-white/72 hover:text-ink-900 dark:text-ink-300 dark:hover:border-white/10 dark:hover:bg-white/[0.08] dark:hover:text-white"
         )
       }
+      end={exact}
       onClick={onClick}
       to={item.to}
     >
-      <span className="material-symbols-outlined text-[1.2rem]">{item.icon}</span>
-      <span>{item.label}</span>
+      <span
+        className={cn(
+          "absolute bottom-3 left-2 top-3 w-1 rounded-full transition-all duration-200",
+          active ? "bg-white/90" : "bg-transparent group-hover:bg-brand-400/30"
+        )}
+      />
+      <span className="material-symbols-outlined relative z-10 text-[1.2rem]">
+        {item.icon}
+      </span>
+      <span className="relative z-10">{item.label}</span>
     </NavLink>
   );
 }
@@ -33,13 +55,14 @@ export default function DashboardLayout({ role }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const homePath = DASHBOARD_HOME[role] || "";
   const navigation = DASHBOARD_NAVIGATION[role] || [];
   const activeItem = useMemo(
     () =>
       navigation.find((item) =>
-        item.to === location.pathname || location.pathname.startsWith(`${item.to}/`)
+        isNavigationItemActive(location.pathname, item.to, homePath)
       ) || navigation[0],
-    [location.pathname, navigation]
+    [homePath, location.pathname, navigation]
   );
 
   function handleLogout() {
@@ -70,9 +93,21 @@ export default function DashboardLayout({ role }) {
         </button>
       </div>
 
-      <nav className="mt-8 space-y-2">
+      <div className="mt-8">
+        <p className="px-2 text-xs font-semibold uppercase tracking-[0.28em] text-ink-500 dark:text-ink-400">
+          Workspace
+        </p>
+      </div>
+
+      <nav className="mt-4 space-y-2.5">
         {navigation.map((item) => (
-          <SidebarLink item={item} key={item.to} onClick={() => setSidebarOpen(false)} />
+          <SidebarLink
+            active={isNavigationItemActive(location.pathname, item.to, homePath)}
+            exact={item.to === homePath}
+            item={item}
+            key={item.to}
+            onClick={() => setSidebarOpen(false)}
+          />
         ))}
       </nav>
 
@@ -130,7 +165,7 @@ export default function DashboardLayout({ role }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-2xl border border-white/10 bg-white/60 px-4 py-2 text-sm text-ink-600 dark:bg-white/[0.06] dark:text-ink-200">
+                <div className="rounded-[1rem] border border-white/10 bg-white/70 px-4 py-2 text-sm text-ink-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-white/[0.06] dark:text-ink-200">
                   {auth.user?.name}
                 </div>
                 <ThemeToggle />
