@@ -176,9 +176,9 @@ export default function RegisterPage() {
             <TextField
               hint="Needed to create admin and judge accounts."
               icon="key"
-              label="Bootstrap secret"
+              label="Secret passcode"
               onChange={(event) => updateField("bootstrapSecret", event.target.value)}
-              placeholder="Enter bootstrap secret"
+              placeholder="Enter secerrt passcode"
               required
               value={form.bootstrapSecret}
             />
