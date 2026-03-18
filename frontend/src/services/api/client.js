@@ -5,6 +5,29 @@ import { readAuthSession } from "../../context/auth/storage.js";
 const listeners = new Set();
 let pendingRequests = 0;
 
+function normalizeBaseUrl(url) {
+  return url.replace(/\/+$/, "");
+}
+
+function resolveApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return normalizeBaseUrl(configuredBaseUrl);
+  }
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+
+    // Keep the Vite proxy path for local development.
+    if (isLocalHost) {
+      return "";
+    }
+  }
+
+  return "";
+}
+
 function publishPendingState() {
   listeners.forEach((listener) => listener(pendingRequests));
 }
@@ -20,8 +43,7 @@ function endRequest() {
 }
 
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "",
-  withCredentials: true,
+  baseURL: resolveApiBaseUrl(),
 });
 
 client.interceptors.request.use(
