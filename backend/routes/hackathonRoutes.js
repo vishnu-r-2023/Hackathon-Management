@@ -48,6 +48,10 @@ router.post(
       description: Joi.string().allow("").max(5000).optional(),
       startDate: Joi.date().required(),
       endDate: Joi.date().required(),
+      judgeIds: Joi.array()
+        .items(Joi.string().hex().length(24))
+        .unique()
+        .optional(),
     }),
   }),
   hackathonController.createHackathon
@@ -64,6 +68,10 @@ router.put(
       description: Joi.string().allow("").max(5000).optional(),
       startDate: Joi.date().optional(),
       endDate: Joi.date().optional(),
+      judgeIds: Joi.array()
+        .items(Joi.string().hex().length(24))
+        .unique()
+        .optional(),
     }),
   }),
   hackathonController.updateHackathon
@@ -78,4 +86,3 @@ router.delete(
 );
 
 module.exports = router;
-

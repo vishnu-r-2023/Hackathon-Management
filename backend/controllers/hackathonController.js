@@ -3,12 +3,81 @@ const Team = require("../models/Team");
 const Submission = require("../models/Submission");
 const Evaluation = require("../models/Evaluation");
 const Result = require("../models/Result");
+const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const computeHackathonStatus = require("../utils/computeHackathonStatus");
 
+async function resolveJudgeIds(judgeIds = []) {
+  if (!Array.isArray(judgeIds)) {
+    return [];
+  }
+
+  const uniqueJudgeIds = [...new Set(judgeIds.filter(Boolean))];
+  if (!uniqueJudgeIds.length) {
+    return [];
+  }
+
+  const judges = await User.find({
+    _id: { $in: uniqueJudgeIds },
+    role: "judge",
+  }).select("_id");
+
+  if (judges.length !== uniqueJudgeIds.length) {
+    throw new AppError("One or more selected judges are invalid", 400);
+  }
+
+  return uniqueJudgeIds;
+}
+
+async function syncHackathonJudgeAssignments(hackathonId, judgeIds = []) {
+  if (!judgeIds.length) {
+    return;
+  }
+
+  const submissions = await Submission.find({ hackathonId }).select("_id").lean();
+  if (!submissions.length) {
+    return;
+  }
+
+  const submissionIds = submissions.map((submission) => submission._id.toString());
+  const existingEvaluations = await Evaluation.find({
+    submissionId: { $in: submissionIds },
+    judgeId: { $in: judgeIds },
+  })
+    .select("submissionId judgeId")
+    .lean();
+
+  const existingKeys = new Set(
+    existingEvaluations.map(
+      (evaluation) =>
+        `${evaluation.submissionId.toString()}:${evaluation.judgeId.toString()}`
+    )
+  );
+
+  const missingAssignments = [];
+
+  submissionIds.forEach((submissionId) => {
+    judgeIds.forEach((judgeId) => {
+      const key = `${submissionId}:${judgeId}`;
+      if (!existingKeys.has(key)) {
+        missingAssignments.push({
+          submissionId,
+          judgeId,
+          score: null,
+          feedback: "",
+        });
+      }
+    });
+  });
+
+  if (missingAssignments.length) {
+    await Evaluation.insertMany(missingAssignments, { ordered: false });
+  }
+}
+
 const createHackathon = asyncHandler(async (req, res) => {
-  const { title, description, startDate, endDate } = req.body;
+  const { title, description, startDate, endDate, judgeIds = [] } = req.body;
 
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -16,6 +85,7 @@ const createHackathon = asyncHandler(async (req, res) => {
     throw new AppError("Invalid dates", 400);
   }
   if (end <= start) throw new AppError("endDate must be after startDate", 400);
+  const resolvedJudgeIds = await resolveJudgeIds(judgeIds);
 
   const hackathon = await Hackathon.create({
     title,
@@ -23,9 +93,11 @@ const createHackathon = asyncHandler(async (req, res) => {
     startDate: start,
     endDate: end,
     createdBy: req.user.id,
+    judgeIds: resolvedJudgeIds,
     status: computeHackathonStatus(start, end),
   });
 
+  await hackathon.populate("judgeIds", "name email role");
   res.status(201).json(hackathon);
 });
 
@@ -39,7 +111,11 @@ const getHackathons = asyncHandler(async (req, res) => {
 
   const [total, hackathons] = await Promise.all([
     Hackathon.countDocuments(filter),
-    Hackathon.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Hackathon.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("judgeIds", "name email role"),
   ]);
 
   const now = new Date();
@@ -53,10 +129,9 @@ const getHackathons = asyncHandler(async (req, res) => {
 });
 
 const getHackathonById = asyncHandler(async (req, res) => {
-  const hackathon = await Hackathon.findById(req.params.id).populate(
-    "createdBy",
-    "name email role"
-  );
+  const hackathon = await Hackathon.findById(req.params.id)
+    .populate("createdBy", "name email role")
+    .populate("judgeIds", "name email role");
   if (!hackathon) throw new AppError("Hackathon not found", 404);
 
   const json = hackathon.toJSON();
@@ -73,6 +148,9 @@ const updateHackathon = asyncHandler(async (req, res) => {
   if (typeof description === "string") hackathon.description = description;
   if (startDate) hackathon.startDate = new Date(startDate);
   if (endDate) hackathon.endDate = new Date(endDate);
+  if (Object.prototype.hasOwnProperty.call(req.body, "judgeIds")) {
+    hackathon.judgeIds = await resolveJudgeIds(req.body.judgeIds);
+  }
 
   if (hackathon.endDate <= hackathon.startDate) {
     throw new AppError("endDate must be after startDate", 400);
@@ -80,6 +158,11 @@ const updateHackathon = asyncHandler(async (req, res) => {
 
   hackathon.status = computeHackathonStatus(hackathon.startDate, hackathon.endDate);
   await hackathon.save();
+  await syncHackathonJudgeAssignments(
+    hackathon._id.toString(),
+    (hackathon.judgeIds || []).map((judgeId) => judgeId.toString())
+  );
+  await hackathon.populate("judgeIds", "name email role");
 
   res.json(hackathon);
 });
@@ -167,4 +250,3 @@ module.exports = {
   deleteHackathon,
   getHackathonAnalytics,
 };
-

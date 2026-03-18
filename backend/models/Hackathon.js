@@ -9,6 +9,10 @@ const hackathonSchema = new mongoose.Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    judgeIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
     registrationCount: { type: Number, default: 0 },
     participantCount: { type: Number, default: 0 },
     status: { type: String, enum: HACKATHON_STATUSES, default: "upcoming" },
@@ -18,4 +22,3 @@ const hackathonSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Hackathon", hackathonSchema);
-

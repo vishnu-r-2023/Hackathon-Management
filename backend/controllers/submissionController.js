@@ -51,7 +51,22 @@ const createSubmission = asyncHandler(async (req, res) => {
     submittedAt: now,
   });
 
-  res.status(201).json(submission);
+  const judgeIds = (hackathon.judgeIds || []).map((judgeId) => judgeId.toString());
+  if (judgeIds.length) {
+    await Evaluation.insertMany(
+      judgeIds.map((judgeId) => ({
+        submissionId: submission._id,
+        judgeId,
+        score: null,
+        feedback: "",
+      }))
+    );
+  }
+
+  const response = submission.toJSON();
+  response.assignedJudgeCount = judgeIds.length;
+
+  res.status(201).json(response);
 });
 
 const getSubmissions = asyncHandler(async (req, res) => {
@@ -131,4 +146,3 @@ module.exports = {
   getAssignedSubmissions,
   assignJudgeToSubmission,
 };
-

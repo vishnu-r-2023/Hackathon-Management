@@ -1,29 +1,17 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { QueryClientProvider, QueryClient } from 'react-query'
-import { BrowserRouter } from 'react-router-dom'
-import { Toaster } from 'sonner'
-import App from './App'
-import { ThemeSync } from './components/ThemeSync'
-import './index.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+import App from "./App.jsx";
+import AppProviders from "./components/AppProviders.jsx";
+import "./index.css";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Toaster position="top-right" richColors />
-        <ThemeSync />
+    <BrowserRouter>
+      <AppProviders>
         <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
-)
+      </AppProviders>
+    </BrowserRouter>
+  </React.StrictMode>
+);

@@ -1,112 +1,81 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/store';
-import { PrivateRoute, RoleRoute } from './routes/ProtectedRoutes';
+import { Navigate, Route, Routes } from "react-router-dom";
 
-// Layouts
-import { AdminLayout } from './layouts/AdminLayout';
-import { ParticipantLayout } from './layouts/ParticipantLayout';
-import { JudgeLayout } from './layouts/JudgeLayout';
+import DashboardLayout from "./components/DashboardLayout.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import GlobalLoadingBar from "./components/GlobalLoadingBar.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import PublicOnlyRoute from "./components/PublicOnlyRoute.jsx";
+import RoleGuard from "./components/RoleGuard.jsx";
+import RoleHomeRedirect from "./components/RoleHomeRedirect.jsx";
+import ScrollToHash from "./components/ScrollToHash.jsx";
+import AdminHackathonsPage from "./pages/admin/AdminHackathonsPage.jsx";
+import AdminOverviewPage from "./pages/admin/AdminOverviewPage.jsx";
+import AdminSubmissionsPage from "./pages/admin/AdminSubmissionsPage.jsx";
+import AdminUsersPage from "./pages/admin/AdminUsersPage.jsx";
+import JudgeOverviewPage from "./pages/judge/JudgeOverviewPage.jsx";
+import JudgeReviewsPage from "./pages/judge/JudgeReviewsPage.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import NotFoundPage from "./pages/NotFoundPage.jsx";
+import ParticipantHackathonsPage from "./pages/participant/ParticipantHackathonsPage.jsx";
+import ParticipantOverviewPage from "./pages/participant/ParticipantOverviewPage.jsx";
+import ParticipantResultsPage from "./pages/participant/ParticipantResultsPage.jsx";
+import ParticipantSubmissionsPage from "./pages/participant/ParticipantSubmissionsPage.jsx";
+import ParticipantTeamsPage from "./pages/participant/ParticipantTeamsPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
+import UnauthorizedPage from "./pages/UnauthorizedPage.jsx";
 
-// Pages - Auth
-import { Home } from './pages/Home';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { Unauthorized } from './pages/Unauthorized';
-
-// Pages - Admin
-import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { AdminHackathons } from './pages/admin/AdminHackathons';
-import { AdminUsers } from './pages/admin/AdminUsers';
-
-// Pages - Participant
-import { ParticipantDashboard } from './pages/participant/ParticipantDashboard';
-import { ParticipantHackathons } from './pages/participant/ParticipantHackathons';
-import { ParticipantTeams } from './pages/participant/ParticipantTeams';
-import { ParticipantSubmissions } from './pages/participant/ParticipantSubmissions';
-import { ParticipantResults } from './pages/participant/ParticipantResults';
-
-// Pages - Judge
-import { JudgeDashboard } from './pages/judge/JudgeDashboard';
-
-// Navbar (only for public pages)
-import { Navbar } from './components/Navbar';
-
-function App() {
-  const { isAuthenticated, user } = useAuthStore();
-  const defaultAuthedPath =
-    user?.role === 'admin' ? '/admin' : user?.role === 'judge' ? '/judge' : '/dashboard';
-
+export default function App() {
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route
-        path="/"
-        element={
-          <>
-            <Navbar />
-            <Home />
-          </>
-        }
-      />
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to={defaultAuthedPath} /> : <Login />}
-      />
-      <Route
-        path="/register"
-        element={isAuthenticated ? <Navigate to={defaultAuthedPath} /> : <Register />}
-      />
-      <Route path="/unauthorized" element={<Unauthorized />} />
+    <ErrorBoundary>
+      <GlobalLoadingBar />
+      <ScrollToHash />
+      <Routes>
+        <Route element={<HomePage />} path="/" />
 
-      {/* Admin Routes */}
-      <Route
-        path="/admin"
-        element={
-          <RoleRoute allowedRoles={['admin']}>
-            <AdminLayout />
-          </RoleRoute>
-        }
-      >
-        <Route index element={<AdminDashboard />} />
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="hackathons" element={<AdminHackathons />} />
-        <Route path="users" element={<AdminUsers />} />
-      </Route>
+        <Route element={<PublicOnlyRoute />}>
+          <Route element={<LoginPage />} path="/login" />
+          <Route element={<RegisterPage />} path="/register" />
+          <Route element={<Navigate replace to="/register" />} path="/signup" />
+        </Route>
 
-      {/* Participant Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <RoleRoute allowedRoles={['participant']}>
-            <ParticipantLayout />
-          </RoleRoute>
-        }
-      >
-        <Route index element={<ParticipantDashboard />} />
-        <Route path="dashboard" element={<ParticipantDashboard />} />
-        <Route path="hackathons" element={<ParticipantHackathons />} />
-        <Route path="teams" element={<ParticipantTeams />} />
-        <Route path="submissions" element={<ParticipantSubmissions />} />
-        <Route path="results" element={<ParticipantResults />} />
-      </Route>
+        <Route element={<UnauthorizedPage />} path="/unauthorized" />
 
-      {/* Judge Routes */}
-      <Route
-        path="/judge"
-        element={
-          <RoleRoute allowedRoles={['judge']}>
-            <JudgeLayout />
-          </RoleRoute>
-        }
-      >
-        <Route index element={<JudgeDashboard />} />
-        <Route path="dashboard" element={<JudgeDashboard />} />
-      </Route>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<RoleHomeRedirect />} path="/app" />
 
-      {/* Catch all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          <Route element={<RoleGuard allow={["admin"]} />}>
+            <Route element={<DashboardLayout role="admin" />} path="/app/admin">
+              <Route element={<AdminOverviewPage />} index />
+              <Route element={<AdminHackathonsPage />} path="hackathons" />
+              <Route element={<AdminUsersPage />} path="users" />
+              <Route element={<AdminSubmissionsPage />} path="submissions" />
+            </Route>
+          </Route>
+
+          <Route element={<RoleGuard allow={["participant"]} />}>
+            <Route
+              element={<DashboardLayout role="participant" />}
+              path="/app/participant"
+            >
+              <Route element={<ParticipantOverviewPage />} index />
+              <Route element={<ParticipantHackathonsPage />} path="hackathons" />
+              <Route element={<ParticipantTeamsPage />} path="teams" />
+              <Route element={<ParticipantSubmissionsPage />} path="submissions" />
+              <Route element={<ParticipantResultsPage />} path="results" />
+            </Route>
+          </Route>
+
+          <Route element={<RoleGuard allow={["judge"]} />}>
+            <Route element={<DashboardLayout role="judge" />} path="/app/judge">
+              <Route element={<JudgeOverviewPage />} index />
+              <Route element={<JudgeReviewsPage />} path="reviews" />
+            </Route>
+          </Route>
+        </Route>
+
+        <Route element={<NotFoundPage />} path="*" />
+      </Routes>
+    </ErrorBoundary>
   );
 }
-
-export default App;
