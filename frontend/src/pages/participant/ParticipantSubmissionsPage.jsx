@@ -270,10 +270,6 @@ export default function ParticipantSubmissionsPage() {
                     {assignedJudges.length} judges
                   </p>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-ink-600 dark:text-ink-300">
-                  New submissions for this hackathon are automatically routed to the
-                  selected judges for scoring and feedback.
-                </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {assignedJudges.map((judge) => (
                     <span
